@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     llm_base_url: str = ""
     llm_api_key: str = ""
     llm_model: str = ""
-    llm_timeout: int = 90
+    llm_timeout: int = 200
 
     # 模拟模式：最高优先级。开启后忽略用户配置与全局默认，所有大模型调用返回模拟数据（skill 走 mock 分支）
     enable_ai_simulate: bool = False
