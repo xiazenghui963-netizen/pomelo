@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>青柚 AI - 灵感工作台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .toast{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);padding:10px 22px;border-radius:9999px;font-size:14px;color:#fff;opacity:0;transition:.25s;z-index:99}
+    .toast.ok{background:#10b981}.toast.err{background:#ef4444}.toast.show{opacity:1}
+    nav a.active{background:#fdf2f8;color:#be185d}
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-pink-50 via-white to-amber-50">
+  <div id="toast"></div>
+  <nav class="max-w-4xl mx-auto flex items-center gap-1 px-4 py-4">
+    <span class="font-bold text-xl text-pink-600 mr-4">青柚 AI</span>
+    <a href="/index.html" class="active nav-link px-3 py-1.5 rounded-lg text-sm">灵感工作台</a>
+    <a href="/materials.html" class="nav-link px-3 py-1.5 rounded-lg text-sm text-gray-600">私有资料</a>
+    <a href="/history.html" class="nav-link px-3 py-1.5 rounded-lg text-sm text-gray-600">历史任务</a>
+    <a href="/profile.html" class="nav-link px-3 py-1.5 rounded-lg text-sm text-gray-600">用户中心</a>
+    <a href="/config.html" class="nav-link px-3 py-1.5 rounded-lg text-sm text-gray-600">系统配置</a>
+    <span class="ml-auto text-sm text-gray-500"><span id="pointsBadge">--</span> 点</span>
+  </nav>
+
+  <main class="max-w-4xl mx-auto px-4 pb-16">
+    <!-- 合规弹窗 -->
+    <div id="complianceModal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div class="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-xl">
+        <h3 class="text-lg font-bold mb-3">合规使用提示</h3>
+        <p class="text-sm text-gray-600 leading-6 mb-4">
+          青柚 AI 将截图内容用于生成创作灵感，仅供个人创作参考。请您确保上传内容已获得合法授权，不涉及他人隐私、版权或违禁信息。生成内容由 AI 完成，请人工修改后发布。
+        </p>
+        <label class="flex items-start gap-2 text-sm text-gray-700 mb-4">
+          <input id="agreeCheck" type="checkbox" class="mt-1" />
+          <span>我已阅读并同意上述说明</span>
+        </label>
+        <button id="complianceOk" class="w-full py-2.5 rounded-xl text-white bg-pink-500 hover:bg-pink-600 text-sm font-semibold disabled:opacity-50" disabled>开始使用</button>
+      </div>
+    </div>
+
+    <!-- Skill 模板选择 -->
+    <section class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+      <h2 class="font-semibold text-gray-800 mb-1">Skill 创作模板</h2>
+      <p class="text-xs text-gray-400 mb-3">选择 Skill 模板，复用同一套 上传截图 / 手动输入 / 私有向量资料 输入组件</p>
+      <select id="skillSelect" class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-pink-400 outline-none">
+        <option value="">加载中…</option>
+      </select>
+      <p id="skillDesc" class="text-xs text-gray-500 mt-2"></p>
+    </section>
+
+    <!-- 方式1：截图 -->
+    <section class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+      <h2 class="font-semibold text-gray-800 mb-1">方式一：上传爆款截图</h2>
+      <p class="text-xs text-gray-400 mb-4">自动 OCR 提取文案 → 爆款拆解 → 生成标题/正文/标签</p>
+      <p class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">【上传图片仅用于本次AI解析，系统不会保存您的截图，历史记录仅保留文字结果】</p>
+      <div id="dropZone" class="border-2 border-dashed border-pink-200 rounded-xl p-8 text-center cursor-pointer hover:border-pink-400 transition">
+        <p class="text-sm text-gray-500">点击选择或拖拽截图（JPG/PNG/WEBP，≤15MB）</p>
+      </div>
+      <div id="preview" class="hidden mt-4">
+        <img id="previewImg" class="max-h-56 mx-auto rounded-xl border border-gray-100" alt="预览" />
+        <p id="previewName" class="text-xs text-gray-400 text-center mt-2"></p>
+      </div>
+      <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
+    </section>
+
+    <!-- 方式2：选题文本 -->
+    <section class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+      <h2 class="font-semibold text-gray-800 mb-1">方式二：手动输入选题文本</h2>
+      <p class="text-xs text-gray-400 mb-3">输入你观察到的选题/话题，或引用一段文字</p>
+      <textarea id="topicText" rows="4" placeholder="例如：新手如何从0开始做小红书，三个月的真实经历" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-pink-400 outline-none text-sm resize-none"></textarea>
+    </section>
+
+    <!-- 私有资料开关 -->
+    <section class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+      <label class="flex items-center gap-2 mb-3">
+        <input id="useMaterials" type="checkbox" class="w-4 h-4 accent-pink-500" />
+        <span class="text-sm font-medium">启用私有向量资料参与本次生成（最多勾选 3 条）</span>
+      </label>
+      <p class="text-xs text-gray-400 mb-2">⚠️ AI强制约束（人设/格式/禁词）文档最多启用 1 份，多份会冲突被拦截；通用参考素材数量不限。</p>
+      <div id="materialList" class="hidden space-y-2"></div>
+    </section>
+
+    <div class="flex items-center gap-3">
+      <label class="flex items-center gap-2 text-sm text-gray-600">
+        <input id="drawImage" type="checkbox" class="accent-pink-500" />
+        <span>同时生成 AI 配图（会员）</span>
+      </label>
+      <span class="ml-auto text-xs text-gray-400"><span id="costBadge">--</span> 点</span>
+      <button id="submitBtn" class="px-8 py-2.5 rounded-xl text-white bg-pink-500 hover:bg-pink-600 text-sm font-semibold">开始创作</button>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    let sessionImageRef = null;
+    let previewObjectUrl = null;
+    let materials = [];
+
+    async function refreshPoints() {
+      try { const d = await Api.get("/points"); document.getElementById("pointsBadge").textContent = d.points; } catch(_) {}
+    }
+
+    async function loadMaterials() {
+      try { materials = await Api.get("/materials"); } catch(_) { materials = []; }
+    }
+
+    function renderMaterials() {
+      const box = document.getElementById("materialList");
+      const on = document.getElementById("useMaterials").checked;
+      box.classList.toggle("hidden", !on);
+      box.innerHTML = "";
+      if (!on) return;
+      materials.forEach((m) => {
+        const div = document.createElement("label");
+        div.className = "flex items-center gap-2 p-2 rounded-lg hover:bg-pink-50 cursor-pointer";
+        const cb = document.createElement("input");
+        cb.type = "checkbox"; cb.className = "mat-check w-4 h-4 accent-pink-500"; cb.value = m.id;
+        cb.onchange = enforceMaxSelect;
+        const span = document.createElement("span");
+        span.className = "text-sm text-gray-700"; span.textContent = m.title;
+        div.appendChild(cb); div.appendChild(span);
+        box.appendChild(div);
+      });
+    }
+
+    function enforceMaxSelect() {
+      const checks = [...document.querySelectorAll(".mat-check:checked")];
+      if (checks.length > 3) {
+        checks.forEach((c, i) => { if (i === 3) c.checked = false; });
+        toast("最多选择 3 条私有资料", "err");
+      }
+    }
+
+    let fileUploaded = false;
+    function showCompliance(cb) {
+      const modal = document.getElementById("complianceModal");
+      if (localStorage.getItem("qy_compliance")) { cb(); return; }
+      modal.classList.remove("hidden");
+      document.getElementById("agreeCheck").onchange = e => {
+        document.getElementById("complianceOk").disabled = !e.target.checked;
+      };
+      document.getElementById("complianceOk").onclick = () => {
+        localStorage.setItem("qy_compliance", "1");
+        modal.classList.add("hidden");
+        cb();
+      };
+    }
+
+    document.getElementById("dropZone").onclick = () => document.getElementById("fileInput").click();
+    document.getElementById("fileInput").onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      showCompliance(async () => {
+        try {
+          if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+          previewObjectUrl = URL.createObjectURL(f);
+          document.getElementById("previewImg").src = previewObjectUrl;
+          document.getElementById("previewName").textContent = f.name;
+          document.getElementById("preview").classList.remove("hidden");
+          const d = await Api.upload(f);
+          sessionImageRef = d.session_image;
+          toast("截图已上传，仅本次 AI 解析使用，不会被保存");
+        } catch (err) { toast(err.message, "err"); }
+      });
+      e.target.value = "";
+    };
+
+    document.getElementById("useMaterials").onchange = renderMaterials;
+
+    let skills = [];
+    let selectedSkill = "screenshot_xhs_analyze";
+
+    async function loadSkills() {
+      try { skills = (await Api.get("/skill/list")) || []; } catch(_) { skills = []; }
+      const sel = document.getElementById("skillSelect");
+      sel.innerHTML = "";
+      if (!skills.some(s => s.skill_id === "screenshot_xhs_analyze")) {
+        const o = document.createElement("option");
+        o.value = "screenshot_xhs_analyze";
+        o.textContent = "小红书截图爆款拆解（默认）";
+        sel.appendChild(o);
+      }
+      skills.forEach(s => {
+        const o = document.createElement("option");
+        o.value = s.skill_id;
+        o.textContent = s.name;
+        sel.appendChild(o);
+      });
+      showSkillDesc();
+    }
+
+    function showSkillDesc() {
+      const id = document.getElementById("skillSelect").value;
+      selectedSkill = id || "screenshot_xhs_analyze";
+      const s = skills.find(x => x.skill_id === selectedSkill);
+      const el = document.getElementById("skillDesc");
+      const badge = document.getElementById("costBadge");
+      if (s) { el.textContent = `简介：${s.desc}`; if (badge) badge.textContent = `${s.cost_point || 0} 点`; }
+      else { el.textContent = ""; if (badge) badge.textContent = "--"; }
+    }
+    document.getElementById("skillSelect").onchange = showSkillDesc;
+
+    document.getElementById("submitBtn").onclick = async () => {
+      try {
+        const text = document.getElementById("topicText").value.trim();
+        const skillId = document.getElementById("skillSelect").value || "screenshot_xhs_analyze";
+        const useMat = document.getElementById("useMaterials").checked;
+        const materialIds = useMat ? [...document.querySelectorAll(".mat-check:checked")].map(c => Number(c.value)) : [];
+        const imageRef = sessionImageRef || null;
+        const drawImage = document.getElementById("drawImage").checked;
+
+        if (!imageRef && !text) { toast("请上传截图或填写选题文本", "err"); return; }
+        const body = { task_type: "skill_task", skill_id: skillId, text, session_image: imageRef, use_materials: useMat, material_ids: materialIds, draw_image: drawImage };
+        const d = await Api.post("/tasks", body);
+        location.href = `/result.html?id=${d.task_id}`;
+      } catch (err) { toast(err.message, "err"); }
+    };
+
+    Api.requireAuth();
+    refreshPoints(); loadMaterials().then(renderMaterials); loadSkills();
+  </script>
+</body>
+</html>

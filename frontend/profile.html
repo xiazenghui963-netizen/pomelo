@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>用户中心 - 青柚 AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .toast{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);padding:10px 22px;border-radius:9999px;font-size:14px;color:#fff;opacity:0;transition:.25s;z-index:99}
+    .toast.ok{background:#10b981}.toast.err{background:#ef4444}.toast.show{opacity:1}
+    nav a.active{background:#fdf2f8;color:#be185d}
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-pink-50 via-white to-amber-50">
+  <div id="toast"></div>
+  <nav class="max-w-4xl mx-auto flex items-center gap-1 px-4 py-4">
+    <span class="font-bold text-xl text-pink-600 mr-4">青柚 AI</span>
+    <a href="/index.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">灵感工作台</a>
+    <a href="/materials.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">私有资料</a>
+    <a href="/history.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">历史任务</a>
+    <a href="/profile.html" class="active px-3 py-1.5 rounded-lg text-sm">用户中心</a>
+    <a href="/config.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">系统配置</a>
+    <button id="logoutBtn" class="ml-auto px-3 py-1.5 rounded-lg text-sm bg-gray-100 hover:bg-gray-200">退出登录</button>
+  </nav>
+
+  <main class="max-w-4xl mx-auto px-4 pb-16">
+    <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+      <p class="text-sm text-gray-500 mb-1">当前账号</p>
+      <h2 id="username" class="text-xl font-bold text-gray-800">-</h2>
+      <div class="flex gap-3 mt-4 flex-wrap">
+        <div class="flex-1 min-w-32 bg-pink-50 rounded-xl p-4 text-center">
+          <p class="text-xs text-gray-400">剩余点数</p>
+          <p id="points" class="text-2xl font-bold text-pink-600">-</p>
+          <p id="grant" class="text-xs text-gray-400">今日已领取 0</p>
+        </div>
+        <div class="flex-1 min-w-32 bg-amber-50 rounded-xl p-4 text-center">
+          <p class="text-xs text-gray-400">会员状态</p>
+          <p id="member" class="text-2xl font-bold text-amber-500">普通用户</p>
+          <button id="memberBtn" class="mt-2 px-4 py-1.5 rounded-lg text-xs bg-amber-500 text-white hover:bg-amber-600">模拟开通会员</button>
+        </div>
+      </div>
+      <div class="mt-6 bg-gray-50 rounded-xl p-4 text-xs text-gray-500 leading-6">
+        <p>▪ 免费用户每日自动赠送点数（调用时后端自动结算）</p>
+        <p>▪ 会员可解锁：截图VLM解析（8点）、AI 改写（8点）、AI 配图（10点）</p>
+        <p>▪ 会员为模拟状态，不接入真实支付</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    async function load() {
+      try {
+        const me = await Api.get("/auth/me");
+        const pts = await Api.get("/points");
+        document.getElementById("username").textContent = me.nickname || me.username;
+        document.getElementById("points").textContent = pts.points;
+        document.getElementById("grant").textContent = `今日已领取 ${pts.daily_grant_today}`;
+        document.getElementById("member").textContent = me.is_member ? "会员" : "普通用户";
+        document.getElementById("memberBtn").textContent = me.is_member ? "已是会员" : "模拟开通会员";
+        document.getElementById("memberBtn").disabled = !!me.is_member;
+        document.getElementById("memberBtn").style.opacity = me.is_member ? 0.5 : 1;
+      } catch (err) { toast(err.message, "err"); }
+    }
+    document.getElementById("memberBtn").onclick = async () => {
+      try { await Api.post("/member/activate", {}); toast("会员已开通（模拟）"); load(); }
+      catch (err) { toast(err.message, "err"); }
+    };
+    document.getElementById("logoutBtn").onclick = () => Api.logout();
+    if (!Api.requireAuth()) {}
+    load();
+  </script>
+</body>
+</html>

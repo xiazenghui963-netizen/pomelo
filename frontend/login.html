@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>登录 - 青柚 AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .toast{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);padding:10px 22px;border-radius:9999px;font-size:14px;color:#fff;opacity:0;transition:.25s;z-index:99}
+    .toast.ok{background:#10b981}.toast.err{background:#ef4444}.toast.show{opacity:1}
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-white to-amber-50">
+  <div class="w-full max-w-md p-6">
+    <div id="toast"></div>
+    <div class="bg-white rounded-2xl shadow-lg p-8">
+      <h1 class="text-3xl font-bold text-center text-pink-600">青柚 AI</h1>
+      <p class="text-center text-sm text-gray-400 mt-1 mb-6">截图解析爆款 · 创作灵感助手</p>
+      <div class="flex gap-2 mb-4">
+        <button id="tabLogin" class="flex-1 py-2 rounded-xl text-sm font-medium bg-pink-50 text-pink-600 border border-pink-100">登录</button>
+        <button id="tabReg" class="flex-1 py-2 rounded-xl text-sm font-medium bg-gray-50 text-gray-500 border border-gray-100">注册</button>
+      </div>
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <input id="username" required type="text" placeholder="用户名" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-pink-400 outline-none" />
+        </div>
+        <div>
+          <input id="password" required type="password" placeholder="密码" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-pink-400 outline-none" />
+        </div>
+        <div id="nicknameBox" class="hidden">
+          <input id="nickname" type="text" placeholder="昵称（可选）" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-pink-400 outline-none" />
+        </div>
+        <button id="submitBtn" class="w-full py-2.5 rounded-xl text-white bg-pink-500 hover:bg-pink-600 transition text-sm font-semibold" type="submit">登录</button>
+      </form>
+      <p class="text-center text-xs text-gray-400 mt-4">注：会员为模拟开通，不接入真实支付</p>
+    </div>
+  </div>
+  <script src="/js/api.js"></script>
+  <script>
+    let mode = "login";
+    const tab = (m) => {
+      mode = m;
+      document.getElementById("nicknameBox").classList.toggle("hidden", m === "login");
+      document.getElementById("submitBtn").textContent = m === "login" ? "登录" : "注册";
+      document.getElementById("tabLogin").className = m === "login" ? "flex-1 py-2 rounded-xl text-sm font-medium bg-pink-50 text-pink-600 border border-pink-100" : "flex-1 py-2 rounded-xl text-sm font-medium bg-gray-50 text-gray-500 border border-gray-100";
+      document.getElementById("tabReg").className = m === "register" ? "flex-1 py-2 rounded-xl text-sm font-medium bg-pink-50 text-pink-600 border border-pink-100" : "flex-1 py-2 rounded-xl text-sm font-medium bg-gray-50 text-gray-500 border border-gray-100";
+    };
+    document.getElementById("tabLogin").onclick = () => tab("login");
+    document.getElementById("tabReg").onclick = () => tab("register");
+    document.getElementById("loginForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const body = { username: document.getElementById("username").value.trim(), password: document.getElementById("password").value };
+      try {
+        const data = mode === "login"
+          ? await Api.post("/auth/login", body)
+          : await Api.post("/auth/register", { ...body, nickname: document.getElementById("nickname").value.trim() });
+        Api.setToken(data.token);
+        location.href = "/index.html";
+      } catch (err) {
+        toast(err.message, "err");
+      }
+    };
+    if (Api.token() && location.search.indexOf("logout") === -1) location.href = "/index.html";
+  </script>
+</body>
+</html>

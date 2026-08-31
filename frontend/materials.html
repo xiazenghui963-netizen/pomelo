@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>私有资料 - 青柚 AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .toast{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);padding:10px 22px;border-radius:9999px;font-size:14px;color:#fff;opacity:0;transition:.25s;z-index:99}
+    .toast.ok{background:#10b981}.toast.err{background:#ef4444}.toast.show{opacity:1}
+    nav a.active{background:#fdf2f8;color:#be185d}
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-pink-50 via-white to-amber-50">
+  <div id="toast"></div>
+  <nav class="max-w-4xl mx-auto flex items-center gap-1 px-4 py-4">
+    <span class="font-bold text-xl text-pink-600 mr-4">青柚 AI</span>
+    <a href="/index.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">灵感工作台</a>
+    <a href="/materials.html" class="active px-3 py-1.5 rounded-lg text-sm">私有资料</a>
+    <a href="/history.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">历史任务</a>
+    <a href="/profile.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">用户中心</a>
+    <a href="/config.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">系统配置</a>
+    <span class="ml-auto text-sm text-gray-400">资料仅自己可见</span>
+  </nav>
+
+  <main class="max-w-4xl mx-auto px-4 pb-16">
+    <p class="text-xs text-amber-600 mb-4">提示：生成任务中最多引用 3 条资料，单条不超过 2000 字，超出即失败。</p>
+
+    <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+      <h2 class="font-semibold mb-3">新增私有资料</h2>
+      <form id="createForm" class="space-y-3">
+        <input id="mTitle" required maxlength="64" placeholder="标题（如：我的账号简介）" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-pink-400 outline-none text-sm" />
+        <label class="block text-xs text-gray-500 mb-1">文档类型（不标记默认：通用参考素材）</label>
+        <select id="mDocType" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-pink-400 outline-none text-sm">
+          <option value="reference_context" selected>通用参考素材（人物/企业/产品/案例等事实背景）</option>
+          <option value="hard_instruction">AI强制生成约束（人设、输出格式、禁词、语气）</option>
+        </select>
+        <textarea id="mContentArea" required rows="5" maxlength="2000" placeholder="资料内容（≤2000字）" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-pink-400 outline-none text-sm"></textarea>
+        <p id="contentCounter" class="text-xs text-gray-400 text-right">0 / 2000</p>
+        <button id="submitText" class="px-6 py-2 rounded-xl text-white bg-pink-500 hover:bg-pink-600 text-sm font-semibold">保存资料</button>
+      </form>
+    </div>
+
+    <div id="list" class="space-y-3"></div>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    function esc(s) { const d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
+
+    const MAX_CHARS = 2000;
+    const contentArea = document.getElementById("mContentArea");
+    const contentCounter = document.getElementById("contentCounter");
+    const submitText = document.getElementById("submitText");
+
+    function refreshCounter() {
+      const len = contentArea.value.length;
+      contentCounter.textContent = `${len} / ${MAX_CHARS}`;
+      contentCounter.className = len >= MAX_CHARS
+        ? "text-xs text-red-500 text-right"
+        : "text-xs text-gray-400 text-right";
+      // 到达上限：禁用保存按钮
+      if (len >= MAX_CHARS) {
+        submitText.disabled = true;
+        submitText.classList.add("opacity-50", "cursor-not-allowed");
+      } else {
+        submitText.disabled = false;
+        submitText.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+    }
+
+    contentArea.addEventListener("input", () => {
+      refreshCounter();
+      if (contentArea.value.length >= MAX_CHARS) {
+        toast("单条资料最大2000字符，请删减内容", "err");
+      }
+    });
+
+    async function load() {
+      const rows = await Api.get("/materials");
+      const box = document.getElementById("list");
+      box.innerHTML = "";
+      rows.forEach((r) => {
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-2xl p-5 shadow-sm";
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h3 class="font-medium text-gray-800">${esc(r.title)}</h3>
+              <span class="text-xs text-gray-400">id:${r.id} · ${String(r.created_at).slice(0,10)}</span>
+            </div>
+            <div class="flex gap-2">
+              <button class="editBtn px-3 py-1 rounded-lg text-xs bg-gray-100 hover:bg-gray-200">编辑</button>
+              <button class="delBtn px-3 py-1 rounded-lg text-xs bg-red-50 text-red-500 hover:bg-red-100">删除</button>
+            </div>
+          </div>
+          <p class="text-sm text-gray-600 whitespace-pre-wrap">${esc(r.content)}</p>`;
+        card.querySelector(".editBtn").onclick = () => { editing = r.id; document.getElementById("mTitle").value = r.title; document.getElementById("mContentArea").value = r.content; document.getElementById("submitText").textContent = "更新资料"; refreshCounter(); };
+        card.querySelector(".delBtn").onclick = async () => { if (!confirm("确认删除该资料？")) return; await Api.del(`/materials/${r.id}`); toast("已删除"); load(); };
+        box.appendChild(card);
+      });
+    }
+    let editing = null;
+    document.getElementById("createForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const title = document.getElementById("mTitle").value.trim();
+      const content = document.getElementById("mContentArea").value.trim();
+      const docType = document.getElementById("mDocType").value;
+      const body = { title, content, doc_type: docType, source_name: title };
+      try {
+        if (editing) { await Api.put(`/materials/${editing}`, body); toast("已更新"); editing = null; }
+        else { await Api.post("/materials", body); toast("已保存"); }
+        document.getElementById("submitText").textContent = "保存资料";
+        document.getElementById("createForm").reset();
+        refreshCounter();
+        load();
+      } catch (err) { toast(err.message, "err"); }
+    };
+    if (!Api.requireAuth()) {}
+    load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>系统配置 - 青柚 AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .toast{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);padding:10px 22px;border-radius:9999px;font-size:14px;color:#fff;opacity:0;transition:.25s;z-index:99}
+    .toast.ok{background:#10b981}.toast.err{background:#ef4444}.toast.show{opacity:1}
+    nav a.active{background:#fdf2f8;color:#be185d}
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-pink-50 via-white to-amber-50">
+  <div id="toast"></div>
+  <nav class="max-w-6xl mx-auto flex items-center gap-1 px-4 py-4">
+    <span class="font-bold text-xl text-pink-600 mr-4">青柚 AI</span>
+    <a href="/index.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">灵感工作台</a>
+    <a href="/materials.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">私有资料</a>
+    <a href="/history.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">历史任务</a>
+    <a href="/profile.html" class="px-3 py-1.5 rounded-lg text-sm text-gray-600">用户中心</a>
+    <a href="/config.html" class="active px-3 py-1.5 rounded-lg text-sm">系统配置</a>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-4 pb-16">
+    <div class="flex gap-6 flex-col md:flex-row">
+      <!-- 左侧：新增/编辑模型表单 -->
+      <div class="md:w-80 bg-white rounded-2xl p-6 shadow-sm h-fit">
+        <h2 id="formTitle" class="text-lg font-bold text-gray-800 mb-1">新增模型</h2>
+        <p class="text-xs text-gray-400 mb-5">配置保存后立即生效，对应类型的 Skill 调用自动使用默认模型；不配置则使用系统默认。</p>
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">类型</label>
+          <div class="flex gap-2">
+            <button id="typeText" type="button" class="flex-1 py-2 rounded-xl text-sm font-medium bg-pink-500 text-white">文本模型</button>
+            <button id="typeImage" type="button" class="flex-1 py-2 rounded-xl text-sm font-medium bg-gray-100 text-gray-500">图片模型</button>
+          </div>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">配置名称</label>
+            <input id="configName" type="text" placeholder="例如：我的 GPT" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-pink-400 outline-none text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">模型名称</label>
+            <input id="modelName" type="text" placeholder="例如 gpt-4o-mini" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-pink-400 outline-none text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Base URL</label>
+            <input id="baseUrl" type="text" placeholder="例如 https://api.example.com/v1" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-pink-400 outline-none text-sm" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+            <input id="apiKey" type="password" placeholder="填写密钥（编辑时不填则保留原密钥）" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:border-pink-400 outline-none text-sm" />
+            <p id="apiKeyHint" class="text-xs text-gray-400 mt-1"></p>
+          </div>
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input id="isDefault" type="checkbox" class="accent-pink-500" />
+            <span>设为该类型默认配置</span>
+          </label>
+        </div>
+        <div class="flex gap-3 mt-6">
+          <button id="saveBtn" class="flex-1 py-2.5 rounded-xl text-white bg-pink-500 hover:bg-pink-600 text-sm font-semibold">保存</button>
+          <button id="cancelBtn" class="flex-1 py-2.5 rounded-xl text-gray-500 bg-gray-100 hover:bg-gray-200 text-sm font-semibold hidden">取消编辑</button>
+        </div>
+      </div>
+
+      <!-- 右侧：模型列表，文本/图片两列 -->
+      <div class="flex-1">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <section>
+            <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              文本模型
+              <span id="textBadge" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">0</span>
+            </h2>
+            <div id="textList" class="space-y-3"></div>
+          </section>
+          <section>
+            <h2 class="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              图片模型
+              <span id="imageBadge" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">0</span>
+            </h2>
+            <div id="imageList" class="space-y-3"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-xs text-gray-400 mt-8 pt-4 border-t border-gray-100">
+      提示：配置保存后立即生效，所有AI创作、解析、改写均使用对应类型的默认模型；不配置则使用系统默认模型。
+    </p>
+  </main>
+
+  <script src="/js/api.js"></script>
+  <script>
+    if (!Api.requireAuth()) {}
+
+    let editingId = null;
+    let curType = "text";
+    let models = [];
+
+    function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML; }
+    function mask(s) { if (!s) return ""; if (s.length <= 8) return s.slice(0,2) + "****" + s.slice(-2); return s.slice(0,4) + "****" + s.slice(-4); }
+    function setType(t) {
+      curType = t;
+      document.getElementById("typeText").className = t === "text" ? "flex-1 py-2 rounded-xl text-sm font-medium bg-pink-500 text-white" : "flex-1 py-2 rounded-xl text-sm font-medium bg-gray-100 text-gray-500";
+      document.getElementById("typeImage").className = t === "image" ? "flex-1 py-2 rounded-xl text-sm font-medium bg-pink-500 text-white" : "flex-1 py-2 rounded-xl text-sm font-medium bg-gray-100 text-gray-500";
+      document.getElementById("formTitle").textContent = editingId ? "编辑模型（" + (t === "text" ? "文本" : "图片") + "）" : "新增模型";
+    }
+    document.getElementById("typeText").onclick = () => setType("text");
+    document.getElementById("typeImage").onclick = () => setType("image");
+
+    function card(m) {
+      const isDefault = m.is_default ? '<span class="text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-600">默认</span>' : "";
+      const keyStatus = m.has_key ? '<span class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-600">已配置密钥</span>' : '<span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">未配置密钥</span>';
+      const d = document.createElement("div");
+      d.className = "bg-white rounded-2xl p-4 shadow-sm";
+      d.innerHTML = `
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-medium text-gray-800">${esc(m.config_name)}</h3>
+          ${isDefault}
+        </div>
+        <p class="text-xs text-gray-500 mb-1">模型：<span class="text-gray-700">${esc(m.model_name || "--")}</span></p>
+        <p class="text-xs text-gray-400 mb-2 break-all">${esc(m.base_url || "--")}</p>
+        <p class="mb-3">${keyStatus} <span class="text-xs text-gray-400 ml-1">${esc(m.api_key_masked ? "密钥 " + m.api_key_masked : "")}</span></p>
+        <div class="flex gap-2 flex-wrap">
+          <button data-act="default" data-id="${m.id}" class="px-3 py-1.5 rounded-lg text-xs bg-amber-50 text-amber-600 hover:bg-amber-100">设为默认</button>
+          <button data-act="check" data-id="${m.id}" class="px-3 py-1.5 rounded-lg text-xs bg-blue-50 text-blue-600 hover:bg-blue-100">检查</button>
+          <button data-act="edit" data-id="${m.id}" class="px-3 py-1.5 rounded-lg text-xs bg-gray-100 text-gray-600 hover:bg-gray-200">编辑</button>
+          <button data-act="del" data-id="${m.id}" class="px-3 py-1.5 rounded-lg text-xs bg-red-50 text-red-500 hover:bg-red-100">删除</button>
+        </div>`;
+      d.querySelector('[data-act="default"]').onclick = async () => {
+        try { await Api.post(`/llm-models/${m.id}/set-default`, {}); toast("已设为默认"); load(); }
+        catch (err) { toast(err.message, "err"); }
+      };
+      d.querySelector('[data-act="check"]').onclick = async () => {
+        try { const r = await Api.post(`/llm-models/${m.id}/check`, {}); r.ok ? toast("连接成功", "ok") : toast("连接失败", "err"); }
+        catch (err) { toast("连接失败", "err"); }
+      };
+      d.querySelector('[data-act="edit"]').onclick = () => editModel(m);
+      d.querySelector('[data-act="del"]').onclick = async () => {
+        if (!confirm("确认删除该模型配置？")) return;
+        try { await Api.del(`/llm-models/${m.id}`); toast("已删除"); load(); }
+        catch (err) { toast(err.message, "err"); }
+      };
+      return d;
+    }
+
+    function render() {
+      const textBox = document.getElementById("textList");
+      const imageBox = document.getElementById("imageList");
+      textBox.innerHTML = "";
+      imageBox.innerHTML = "";
+      const text = models.filter(m => m.type === "text");
+      const image = models.filter(m => m.type === "image");
+      document.getElementById("textBadge").textContent = String(text.length);
+      document.getElementById("imageBadge").textContent = String(image.length);
+      text.forEach(m => textBox.appendChild(card(m)));
+      image.forEach(m => imageBox.appendChild(card(m)));
+      if (!text.length) textBox.innerHTML = '<p class="text-sm text-gray-400 py-6 text-center">暂无文本模型配置</p>';
+      if (!image.length) imageBox.innerHTML = '<p class="text-sm text-gray-400 py-6 text-center">暂无图片模型配置</p>';
+    }
+
+    async function load() {
+      try {
+        const d = await Api.get("/llm-models");
+        // 去重：按 id 唯一，防止接口重复返回导致重复渲染
+        const seen = new Set();
+        models = (d.models || []).filter(m => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+        if (d.enable_ai_simulate) toast("模拟模式已开启，连接检查将跳过真实调用");
+        render();
+      } catch (err) { toast(err.message, "err"); }
+    }
+
+    function editModel(m) {
+      editingId = m.id;
+      setType(m.type);
+      document.getElementById("configName").value = m.config_name || "";
+      document.getElementById("modelName").value = m.model_name || "";
+      document.getElementById("baseUrl").value = m.base_url || "";
+      document.getElementById("apiKey").value = "";
+      document.getElementById("apiKey").dataset.masked = m.api_key_masked || "";
+      document.getElementById("isDefault").checked = !!m.is_default;
+      document.getElementById("apiKeyHint").textContent = "留空表示保留原密钥" + (m.api_key_masked ? "（当前 " + m.api_key_masked + "）" : "");
+      document.getElementById("cancelBtn").classList.remove("hidden");
+      document.getElementById("saveBtn").textContent = "保存修改";
+      document.getElementById("formTitle").textContent = "编辑模型（" + (m.type === "text" ? "文本" : "图片") + "）";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function resetForm() {
+      editingId = null;
+      setType("text");
+      document.getElementById("configName").value = "";
+      document.getElementById("modelName").value = "";
+      document.getElementById("baseUrl").value = "";
+      document.getElementById("apiKey").value = "";
+      document.getElementById("apiKey").removeAttribute("data-masked");
+      document.getElementById("isDefault").checked = false;
+      document.getElementById("apiKeyHint").textContent = "";
+      document.getElementById("cancelBtn").classList.add("hidden");
+      document.getElementById("saveBtn").textContent = "保存";
+      document.getElementById("formTitle").textContent = "新增模型";
+    }
+
+    document.getElementById("cancelBtn").onclick = resetForm;
+
+    // 保存防抖：300ms 内只允许触发一次
+    let saveLocked = false;
+    let saveTimer = null;
+    function throttleSave(fn) {
+      if (saveLocked) return;
+      saveLocked = true;
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => { saveLocked = false; }, 300);
+      fn();
+    }
+
+    const saveBtn = document.getElementById("saveBtn");
+    function setSaving(on) {
+      saveBtn.disabled = on;
+      saveBtn.textContent = on ? "保存中…" : (editingId ? "保存修改" : "保存");
+      saveBtn.classList.toggle("opacity-60", on);
+    }
+
+    saveBtn.onclick = () => throttleSave(async () => {
+      const apiKeyInput = document.getElementById("apiKey");
+      const body = {
+        type: curType,
+        config_name: document.getElementById("configName").value.trim(),
+        model_name: document.getElementById("modelName").value.trim(),
+        base_url: document.getElementById("baseUrl").value.trim(),
+        api_key: apiKeyInput.value,
+        api_key_masked_confirm: apiKeyInput.dataset.masked || "",
+        is_default: document.getElementById("isDefault").checked,
+      };
+      if (!body.config_name || !body.model_name) {
+        saveLocked = false;
+        toast("请填写配置名称和模型名称", "err");
+        return;
+      }
+      setSaving(true);
+      try {
+        if (editingId) { await Api.put(`/llm-models/${editingId}`, body); toast("已保存修改"); }
+        else { await Api.post("/llm-models", body); toast("已新增"); }
+        resetForm();   // 成功后立即清空表单，避免重复提交相同内容
+        await load();
+      } catch (err) {
+        toast(err.message, "err");
+      } finally {
+        setSaving(false);
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>
