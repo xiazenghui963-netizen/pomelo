@@ -11,6 +11,26 @@ from app.models import UserLlmModel
 logger = logging.getLogger(__name__)
 
 
+class LLMTimeoutError(Exception):
+    """大模型接口请求超时（read/connect timed out）。"""
+
+    def __init__(self, message: str = "大模型接口请求超时，请重试，或更换模型API"):
+        super().__init__(message)
+
+
+class LLMError(Exception):
+    """大模型接口调用失败（网络/HTTP等）。"""
+
+    def __init__(self, message: str = "大模型接口调用失败，请重试，或更换模型API"):
+        super().__init__(message)
+
+
+def _prompt_summary(system: str, user: str) -> str:
+    s = (system or "").replace("\n", " ").strip()
+    u = (user or "").replace("\n", " ").strip()
+    return f"sys[{s[:120]}] user[{u[:120]}]"
+
+
 class LLMClient:
     similarity_threshold = 0.35
 
@@ -90,6 +110,8 @@ class LLMClient:
     # ---------- 文本对话 ----------
 
     def _chat(self, base_url: str, api_key: str, model: str, system: str, user: str, timeout: int, model_params: dict | None = None) -> str | None:
+        self.last_timeout = False
+        self.last_error = None
         if not (base_url and api_key and model):
             return None
         messages = [{"role": "system", "content": system}]
@@ -114,15 +136,28 @@ class LLMClient:
             self.last_output = text
             logger.info("llm chat ok, chars=%d", len(text or ""))
             return text
+        except httpx.TimeoutException as exc:
+            # 超时必须与正常失败区分，禁止静默走 mock 模板
+            self.last_timeout = True
+            logger.error("llm chat 请求超时: %s | prompt=%s", exc, _prompt_summary(system, user), exc_info=True)
+            return None
         except Exception as exc:  # noqa: BLE001
-            logger.warning("llm chat failed: %s", exc)
+            self.last_error = exc
+            logger.error("llm chat 调用失败: %s | prompt=%s", exc, _prompt_summary(system, user), exc_info=True)
             return None
 
     def chat(self, system: str, user: str, model_params: dict | None = None) -> str | None:
         resolved = self._resolve_text()
         if resolved.get("mode") == "simulate":
             return None
-        return self._chat(resolved["base_url"], resolved["api_key"], resolved["model"], system, user, settings.llm_timeout, model_params)
+        text = self._chat(resolved["base_url"], resolved["api_key"], resolved["model"], system, user, settings.llm_timeout, model_params)
+        # 区分超时与普通失败：直接抛异常，禁止上层静默走 mock 模板
+        if text is None:
+            if self.last_timeout:
+                raise LLMTimeoutError()
+            if self.last_error is not None:
+                raise LLMError()
+        return text
 
     def test_chat(self, base_url: str, api_key: str, model: str) -> str | None:
         return self._chat(base_url, api_key, model, "你是连接测试助手，请只回复：连接成功。", "测试连接", settings.llm_timeout)

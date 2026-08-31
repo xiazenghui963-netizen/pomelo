@@ -8,7 +8,7 @@ import json
 import re
 
 from app.core.errors import BizError
-from app.services.llm import safe_json
+from app.services.llm import LLMError, LLMTimeoutError, safe_json
 from app.services.skill_configs import DEFAULT_SKILL_ID, load_config
 
 BASE_SYSTEM_PROMPT = """# 角色：通用AI内容执行器
@@ -205,7 +205,12 @@ def run_skill_task(task, inputs: dict, llm, db) -> dict:
 
     vector_context = jobs._build_vector_block(db, task, inputs)
     system_prompt = build_prompt(input_text, vector_context, config)
-    raw_out = llm.chat(system_prompt, "请严格执行输出要求，直接返回 JSON 结果。", config.get("model_params"))
+    try:
+        raw_out = llm.chat(system_prompt, "请严格执行输出要求，直接返回 JSON 结果。", config.get("model_params"))
+    except LLMTimeoutError:
+        raise BizError("大模型接口请求超时，请重试，或更换模型API", code=50003, status_code=500)
+    except LLMError:
+        raise BizError("大模型接口调用失败，请重试，或更换模型API", code=50004, status_code=500)
 
     if raw_out is None:
         # 未配置大模型 / 模拟模式：走 mock 分支（与既有 skill 降级策略一致）
