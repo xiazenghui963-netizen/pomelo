@@ -14,6 +14,12 @@ class LoginIn(BaseModel):
     password: str
 
 
+class ChangePasswordIn(BaseModel):
+    old_password: str = Field(min_length=1, max_length=64)
+    new_password: str = Field(min_length=6, max_length=64)
+    confirm_password: str = Field(min_length=6, max_length=64)
+
+
 class MaterialIn(BaseModel):
     title: str = Field(min_length=1, max_length=64)
     content: str = Field(min_length=1)
@@ -47,6 +53,10 @@ class TaskCreateIn(BaseModel):
 class MemberActivateIn(BaseModel):
     username: str = Field(min_length=1, max_length=32)
     is_member: bool = True
+
+
+class GrantPointsIn(BaseModel):
+    amount: int = Field(gt=0)
 
 
 class LlmModelIn(BaseModel):

@@ -46,12 +46,18 @@ def _has_placeholder(text: str) -> bool:
 
 
 def build_prompt(user_input: str, vector_context: str, config: dict) -> str:
+    # 只注入模型真正需要的部分，不灌整份配置（节省输入 token，加快生成）
+    skill_body = {
+        "name": config.get("name", ""),
+        "system_prompt": config.get("system_prompt", ""),
+        "output_json_schema": config.get("output_json_schema", {}),
+    }
     return BASE_SYSTEM_PROMPT.replace(
         "{{user_input}}", (user_input or "（无）").strip()
     ).replace(
         "{{vector_context}}", (vector_context or "（无参考资料）").strip()
     ).replace(
-        "{{skill_config}}", json.dumps(config, ensure_ascii=False, indent=2)
+        "{{skill_config}}", json.dumps(skill_body, ensure_ascii=False, indent=2)
     )
 
 
